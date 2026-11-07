@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+<title>Net Monitor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div id="status" class="pill idle">Starting…</div>
+  <div class="stats">
+    <div><span id="lat">–</span><label>Latency (ms)</label></div>
+    <div><span id="loss">–</span><label>Loss (last 5 min)</label></div>
+    <div><span id="count24">0</span><label>Incidents (24 h)</label></div>
+    <div><span id="down24">0s</span><label>Downtime (24 h)</label></div>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>Live latency <small>(last 5 minutes)</small></h2>
+    <canvas id="chart" width="920" height="200"></canvas>
+  </section>
+  <section>
+    <div class="row">
+      <h2>Incidents</h2>
+      <div class="actions">
+        <button id="settingsBtn">Settings</button>
+        <button id="exportBtn">Export CSV</button>
+        <button id="clearBtn" class="danger">Clear</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Type</th><th>Started</th><th>Duration</th><th>Peak latency</th><th>Worst loss</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="muted">No incidents recorded yet.</p>
+  </section>
+</main>
+<dialog id="settings">
+  <form method="dialog" id="form">
+    <h2>Settings</h2>
+    <label>Targets (one per line, IPs or hostnames)<textarea name="targets" rows="4"></textarea></label>
+    <div class="grid">
+      <label>Probe interval (ms)<input name="intervalMs" type="number" min="500" max="60000"></label>
+      <label>Probe timeout (ms)<input name="timeoutMs" type="number" min="500" max="10000"></label>
+      <label>High latency threshold (ms)<input name="latencyMs" type="number" min="10"></label>
+      <label>Rounds before disconnect alert<input name="failRounds" type="number" min="1" max="20"></label>
+      <label>Rounds before latency alert<input name="latencyRounds" type="number" min="1" max="20"></label>
+      <label>Rounds before packet loss alert<input name="lossRounds" type="number" min="1" max="20"></label>
+    </div>
+    <label class="check"><input name="notifications" type="checkbox"> Desktop notifications</label>
+    <menu><button value="cancel" type="button" id="cancelSettings">Cancel</button><button value="save" id="saveSettings">Save</button></menu>
+  </form>
+</dialog>
+<script src="app.js"></script>
+</body>
+</html>
