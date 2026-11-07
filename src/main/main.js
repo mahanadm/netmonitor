@@ -5,6 +5,7 @@ const path = require('node:path');
 const { Monitor, DEFAULT_SETTINGS } = require('../core/monitor');
 const { IncidentStore } = require('../core/store');
 const { incidentsToCsv } = require('../core/csv');
+const { runTraceroute } = require('../core/traceroute');
 const { icon } = require('./icons');
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -16,6 +17,18 @@ let win, tray, monitor, store, settingsFile, quitting = false;
 let settings = { ...DEFAULT_SETTINGS, notifications: true };
 const samples = [];
 let lastState = 'idle';
+let tracing = false;
+
+// Captures the network path at the start of an incident to show where it breaks.
+async function traceFor(incident) {
+  if (tracing) return;
+  tracing = true;
+  try {
+    const traceroute = await runTraceroute(settings.targets[0]);
+    store.upsert({ id: incident.id, traceroute });
+    send('incidents', store.list());
+  } finally { tracing = false; }
+}
 
 const fmtDur = (ms) => {
   const s = Math.round(ms / 1000);
@@ -88,7 +101,7 @@ function startMonitor() {
   monitor.on('incident', ({ type, incident }) => {
     store.upsert(incident);
     send('incidents', store.list());
-    if (type === 'open') notify(LABELS[incident.type], 'Started — recording incident.');
+    if (type === 'open') { notify(LABELS[incident.type], 'Started — recording incident.'); traceFor(incident); }
     if (type === 'close') notify(`${LABELS[incident.type]} resolved`, `Lasted ${fmtDur(incident.end - incident.start)}.`);
   });
   monitor.start();

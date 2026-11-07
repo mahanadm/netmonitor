@@ -84,7 +84,7 @@ test('csv export escapes and formats', () => {
   const csv = incidentsToCsv([{ type: 'disconnect', start: 0, end: 61000, peakLatency: null, worstLoss: 1, targets: ['1.1.1.1', '=cmd'] }]);
   const lines = csv.trim().split('\r\n');
   assert.strictEqual(lines.length, 2);
-  assert.match(lines[1], /^Disconnect,1970-01-01T00:00:00.000Z,1970-01-01T00:01:01.000Z,61,,100,no,1\.1\.1\.1 =cmd$/);
+  assert.match(lines[1], /^Disconnect,1970-01-01T00:00:00.000Z,1970-01-01T00:01:01.000Z,61,,100,no,1\.1\.1\.1 =cmd,$/);
   assert.ok(incidentsToCsv([{ type: 'x', start: 0, end: null, targets: [] }], 5000).includes(',5,'));
   assert.ok(incidentsToCsv([{ type: "=SUM(1)", start: 0, end: 1 }]).includes("'=SUM(1)"));
 });
@@ -101,4 +101,37 @@ test('monitor tick emits sample and incidents using injected probe', async () =>
   assert.deepStrictEqual(types, ['open', 'close']);
   assert.strictEqual(samples[0].online, false);
   assert.strictEqual(samples[3].online, true);
+});
+
+const { parseTraceroute, summarize, traceArgs } = require('../src/core/traceroute');
+
+test('parseTraceroute handles Windows tracert output', () => {
+  const out = `Tracing route to 1.1.1.1 over a maximum of 12 hops\r\n\r\n  1    <1 ms    <1 ms    <1 ms  192.168.1.1\r\n  2     9 ms    11 ms    10 ms  10.0.0.1\r\n  3     *        *        *     Request timed out.\r\n  4     *        *        *     Request timed out.\r\n\r\nTrace complete.`;
+  const hops = parseTraceroute(out);
+  assert.deepStrictEqual(hops.map((h) => h.ip), ['192.168.1.1', '10.0.0.1', null, null]);
+  assert.strictEqual(hops[1].rtt, 10);
+  assert.match(summarize(hops, '1.1.1.1'), /Last responding hop: #2 \(10\.0\.0\.1\)/);
+});
+
+test('parseTraceroute handles mac/linux output and reached target', () => {
+  const out = 'traceroute to 1.1.1.1 (1.1.1.1), 12 hops max\n 1  192.168.1.1  1.234 ms\n 2  * \n 3  1.1.1.1  15.5 ms\n';
+  const hops = parseTraceroute(out);
+  assert.strictEqual(hops.length, 3);
+  assert.strictEqual(hops[1].ip, null);
+  assert.strictEqual(summarize(hops, '1.1.1.1'), 'Reached 1.1.1.1 in 3 hops');
+});
+
+test('summarize flags a dead local network and empty data', () => {
+  assert.match(summarize([{ hop: 1, ip: null, rtt: null }], '1.1.1.1'), /local network or router/);
+  assert.strictEqual(summarize([], 'x'), 'No traceroute data');
+});
+
+test('traceArgs picks tool per platform', () => {
+  assert.strictEqual(traceArgs('h', 'win32')[0], 'tracert');
+  assert.strictEqual(traceArgs('h', 'darwin')[0], 'traceroute');
+});
+
+test('csv includes traceroute summary', () => {
+  const csv = incidentsToCsv([{ type: 'disconnect', start: 0, end: 1000, targets: [], traceroute: { summary: 'x', hops: [{ hop: 1, ip: '1.2.3.4' }, { hop: 2, ip: null }] } }]);
+  assert.ok(csv.includes('x | 1:1.2.3.4 2:*'));
 });

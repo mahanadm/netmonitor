@@ -13,6 +13,7 @@ evidence to show your ISP.
 - An incident is recorded only after several consecutive bad rounds (default 3) and closed after 2 good ones, so one-off blips don't spam the log. Start time is the first bad round.
 - Incidents are stored as JSON in the app's user-data folder; the app keeps running in the tray when the window is closed.
 - Tray icon: green = online, amber = degraded, red = offline. Desktop notifications on start/end of incidents.
+- When an incident starts, a traceroute to the first target is captured (`tracert` on Windows, `traceroute` on macOS) and attached to it. Click an incident row to see the hops and where the path stops responding.
 - **Export CSV** from the dashboard for sharing.
 
 ## Develop
@@ -29,4 +30,4 @@ npm run dist    # build installers (run on each OS: .exe on Windows, .dmg on mac
 - `src/renderer` – dashboard UI (plain HTML/JS, no build step)
 
 ## Roadmap ideas
-Launch at login, traceroute on incident start to show *where* it fails, DNS-resolution probes, gateway probe, per-incident detail view, data retention settings, code signing.
+Launch at login, DNS-resolution probes, gateway probe, per-incident detail view, data retention settings, code signing.

@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 const LABELS = { disconnect: 'Disconnect', high_latency: 'High latency', packet_loss: 'Packet loss' };
 const WINDOW_MS = 5 * 60 * 1000;
 let samples = [], incidents = [], settings = {};
+const expanded = new Set();
 
 const fmtDur = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -32,7 +33,21 @@ function renderIncidents() {
       } else td.textContent = text;
       tr.append(td);
     });
+    tr.className = 'clickable';
+    tr.title = 'Click for traceroute details';
+    tr.onclick = () => { expanded.has(i.id) ? expanded.delete(i.id) : expanded.add(i.id); renderIncidents(); };
     tbody.append(tr);
+    if (expanded.has(i.id)) {
+      const d = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 5;
+      const pre = document.createElement('pre');
+      const t = i.traceroute;
+      pre.textContent = t
+        ? `Traceroute to ${t.target} at ${new Date(t.at).toLocaleTimeString()}\n${t.summary}\n\n` + t.hops.map((h) => `${String(h.hop).padStart(2)}  ${(h.ip || '*').padEnd(16)} ${h.rtt != null ? h.rtt + ' ms' : ''}`).join('\n')
+        : 'Traceroute not captured yet (it runs when an incident starts and can take a few seconds).';
+      td.append(pre); d.append(td); tbody.append(d);
+    }
   }
   $('empty').hidden = incidents.length > 0;
   const day = incidents.filter((i) => i.start > now - 864e5);

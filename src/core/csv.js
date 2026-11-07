@@ -9,7 +9,7 @@ const esc = (v) => {
 const LABELS = { disconnect: 'Disconnect', high_latency: 'High latency', packet_loss: 'Packet loss' };
 
 function incidentsToCsv(incidents, now = Date.now()) {
-  const rows = [['Type', 'Start (ISO)', 'End (ISO)', 'Duration (s)', 'Peak latency (ms)', 'Worst loss (%)', 'Ongoing', 'Targets']];
+  const rows = [['Type', 'Start (ISO)', 'End (ISO)', 'Duration (s)', 'Peak latency (ms)', 'Worst loss (%)', 'Ongoing', 'Targets', 'Traceroute']];
   for (const i of incidents) {
     const end = i.end ?? now;
     rows.push([
@@ -21,6 +21,7 @@ function incidentsToCsv(incidents, now = Date.now()) {
       Math.round((i.worstLoss || 0) * 100),
       i.end ? 'no' : 'yes',
       (i.targets || []).join(' '),
+      i.traceroute ? `${i.traceroute.summary} | ${i.traceroute.hops.map((h) => `${h.hop}:${h.ip || '*'}`).join(' ')}` : '',
     ]);
   }
   return rows.map((r) => r.map(esc).join(',')).join('\r\n') + '\r\n';
