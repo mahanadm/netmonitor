@@ -135,3 +135,10 @@ test('csv includes traceroute summary', () => {
   const csv = incidentsToCsv([{ type: 'disconnect', start: 0, end: 1000, targets: [], traceroute: { summary: 'x', hops: [{ hop: 1, ip: '1.2.3.4' }, { hop: 2, ip: null }] } }]);
   assert.ok(csv.includes('x | 1:1.2.3.4 2:*'));
 });
+
+test('monitor sample latency is the median, not the mean', async () => {
+  const rtts = { a: 10, b: 20, c: 400 };
+  const m = new Monitor({ targets: ['a', 'b', 'c'] }, async (host) => ({ host, ok: true, rtt: rtts[host] }));
+  const s = await m.tick(0);
+  assert.strictEqual(s.latency, 20);
+});

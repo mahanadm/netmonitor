@@ -1,7 +1,7 @@
 'use strict';
 const { EventEmitter } = require('node:events');
 const { pingOnce } = require('./ping');
-const { IncidentDetector } = require('./detector');
+const { IncidentDetector, median } = require('./detector');
 
 const DEFAULT_SETTINGS = {
   targets: ['1.1.1.1', '8.8.8.8', '9.9.9.9'],
@@ -51,7 +51,7 @@ class Monitor extends EventEmitter {
       t: now,
       results,
       online: results.some((r) => r.ok),
-      latency: okRtts.length ? okRtts.reduce((a, b) => a + b, 0) / okRtts.length : null,
+      latency: median(okRtts), // median, same statistic the detector uses for high-latency incidents
     };
     this.emit('sample', sample);
     for (const e of this.detector.process(results, now)) this.emit('incident', e);

@@ -2,6 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const LABELS = { disconnect: 'Disconnect', high_latency: 'High latency', packet_loss: 'Packet loss' };
 const WINDOW_MS = 5 * 60 * 1000;
+const TARGET_COLORS = ['#38bdf8', '#c084fc', '#fb923c', '#f472b6', '#facc15', '#2dd4bf', '#a3e635', '#94a3b8'];
 let samples = [], incidents = [], settings = {};
 const expanded = new Set();
 
@@ -77,7 +78,8 @@ function drawChart() {
   g.clearRect(0, 0, w, h);
   const css = getComputedStyle(document.documentElement);
   const now = Date.now(), pts = samples.filter((s) => s.t > now - WINDOW_MS);
-  const max = Math.max(100, (settings.detector?.latencyMs || 150) * 1.3, ...pts.map((s) => s.latency || 0));
+  const hosts = [...new Set(pts.flatMap((s) => s.results.map((r) => r.host)))];
+  const max = Math.max(100, (settings.detector?.latencyMs || 150) * 1.3, ...pts.flatMap((s) => s.results.map((r) => r.rtt || 0)));
   const x = (t) => ((t - (now - WINDOW_MS)) / WINDOW_MS) * (w - 40) + 40;
   const y = (v) => h - 20 - (v / max) * (h - 30);
   g.font = '11px system-ui'; g.fillStyle = css.getPropertyValue('--muted'); g.strokeStyle = css.getPropertyValue('--line');
@@ -87,14 +89,42 @@ function drawChart() {
   // red bars where fully offline
   g.fillStyle = 'rgba(239,68,68,.25)';
   pts.forEach((s, i) => { if (!s.online) { const x0 = x(s.t), x1 = i + 1 < pts.length ? x(pts[i + 1].t) : x0 + 4; g.fillRect(x0, 0, Math.max(2, x1 - x0), h - 20); } });
-  g.strokeStyle = css.getPropertyValue('--ok'); g.lineWidth = 2; g.beginPath();
-  let pen = false;
-  for (const s of pts) {
-    if (s.latency == null) { pen = false; continue; }
-    pen ? g.lineTo(x(s.t), y(s.latency)) : g.moveTo(x(s.t), y(s.latency));
-    pen = true;
-  }
-  g.stroke(); g.lineWidth = 1;
+  // One faint line per target, then the bold median on top.
+  const line = (color, width, valueOf) => {
+    g.strokeStyle = color; g.lineWidth = width; g.beginPath();
+    let pen = false;
+    for (const s of pts) {
+      const v = valueOf(s);
+      if (v == null) { pen = false; continue; }
+      pen ? g.lineTo(x(s.t), y(v)) : g.moveTo(x(s.t), y(v));
+      pen = true;
+    }
+    g.stroke();
+  };
+  g.globalAlpha = 0.55;
+  hosts.forEach((h, i) => line(TARGET_COLORS[i % TARGET_COLORS.length], 1, (s) => s.results.find((r) => r.host === h)?.rtt ?? null));
+  g.globalAlpha = 1;
+  line(css.getPropertyValue('--ok'), 2.5, (s) => s.latency);
+  g.lineWidth = 1;
+  drawLegend(hosts);
+}
+
+let legendKey = '';
+function drawLegend(hosts) {
+  const key = hosts.join('|');
+  if (key === legendKey) return;
+  legendKey = key;
+  const el = $('legend');
+  el.replaceChildren();
+  const add = (label, color) => {
+    const span = document.createElement('span');
+    const sw = document.createElement('i');
+    sw.style.background = color;
+    span.append(sw, label);
+    el.append(span);
+  };
+  add('Median', getComputedStyle(document.documentElement).getPropertyValue('--ok'));
+  hosts.forEach((h, i) => add(h, TARGET_COLORS[i % TARGET_COLORS.length]));
 }
 
 function fillForm() {
