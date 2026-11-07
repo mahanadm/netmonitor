@@ -104,6 +104,7 @@ function fillForm() {
   f.latencyMs.value = d.latencyMs ?? 150; f.failRounds.value = d.failRounds ?? 3;
   f.latencyRounds.value = d.latencyRounds ?? 3; f.lossRounds.value = d.lossRounds ?? 3;
   f.notifications.checked = settings.notifications !== false;
+  f.launchAtLogin.checked = !!settings.launchAtLogin;
 }
 
 $('settingsBtn').onclick = () => { fillForm(); $('settings').showModal(); };
@@ -113,6 +114,7 @@ $('form').onsubmit = async () => {
   settings = await window.api.saveSettings({
     targets: f.targets.value.split('\n'), intervalMs: f.intervalMs.value, timeoutMs: f.timeoutMs.value,
     notifications: f.notifications.checked,
+    launchAtLogin: f.launchAtLogin.checked,
     detector: { latencyMs: f.latencyMs.value, failRounds: f.failRounds.value, latencyRounds: f.latencyRounds.value, lossRounds: f.lossRounds.value },
   });
 };

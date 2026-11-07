@@ -14,7 +14,9 @@ const LABELS = { disconnect: 'Internet disconnected', high_latency: 'High latenc
 const MAX_SAMPLES = 900; // ~30 min at 2s interval
 
 let win, tray, monitor, store, settingsFile, quitting = false;
-let settings = { ...DEFAULT_SETTINGS, notifications: true };
+let settings = { ...DEFAULT_SETTINGS, notifications: true, launchAtLogin: false };
+// Started by the OS at login: stay in the tray instead of popping up a window.
+const startHidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin;
 const samples = [];
 let lastState = 'idle';
 let tracing = false;
@@ -52,6 +54,7 @@ function sanitizeSettings(s) {
     intervalMs: num(s.intervalMs, 500, 60000, 2000),
     timeoutMs: num(s.timeoutMs, 500, 10000, 2000),
     notifications: !!s.notifications,
+    launchAtLogin: !!s.launchAtLogin,
     detector: {
       latencyMs: num(d.latencyMs, 10, 5000, 150),
       failRounds: num(d.failRounds, 1, 20, 3),
@@ -71,9 +74,15 @@ function notify(title, body) {
   if (settings.notifications && Notification.isSupported()) new Notification({ title, body, silent: false }).show();
 }
 
-function createWindow() {
+// Only when packaged, so dev runs don't register the bare electron binary as a login item.
+function applyLoginItem() {
+  if (!app.isPackaged) return;
+  app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin, args: ['--hidden'] });
+}
+
+function createWindow(show = true) {
   win = new BrowserWindow({
-    width: 980, height: 720, show: true, title: 'Net Monitor',
+    width: 980, height: 720, show, title: 'Net Monitor',
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   win.setMenuBarVisibility(false);
@@ -125,6 +134,7 @@ app.whenReady().then(() => {
   ipcMain.handle('save-settings', (_e, s) => {
     settings = { ...settings, ...sanitizeSettings(s) };
     saveSettings();
+    applyLoginItem();
     monitor.stop();
     startMonitor();
     return settings;
@@ -146,7 +156,8 @@ app.whenReady().then(() => {
     return r.filePath;
   });
 
-  createWindow();
+  createWindow(!startHidden);
+  applyLoginItem(); // keeps the registered path current after app updates
   startMonitor();
 });
 

@@ -14,6 +14,7 @@ evidence to show your ISP.
 - Incidents are stored as JSON in the app's user-data folder; the app keeps running in the tray when the window is closed.
 - Tray icon: green = online, amber = degraded, red = offline. Desktop notifications on start/end of incidents.
 - When an incident starts, a traceroute to the first target is captured (`tracert` on Windows, `traceroute` on macOS) and attached to it. Click an incident row to see the hops and where the path stops responding.
+- **Launch at login** (Settings, off by default): starts the app minimized to the tray when you sign in. Only applies to the installed app, not `npm start`.
 - **Export CSV** from the dashboard for sharing.
 
 ## Develop
@@ -41,4 +42,4 @@ Builds are **unsigned**. Windows SmartScreen will warn ("More info" > "Run anywa
 - `src/renderer` – dashboard UI (plain HTML/JS, no build step)
 
 ## Roadmap ideas
-Launch at login, DNS-resolution probes, gateway probe, per-incident detail view, data retention settings, code signing.
+DNS-resolution probes, gateway probe, per-incident detail view, data retention settings, code signing.
