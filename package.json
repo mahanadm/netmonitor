@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Monitors internet connectivity and records disconnects and latency incidents",
   "main": "src/main/main.js",
+  "author": "mahanadm",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -23,13 +24,28 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
+    },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist"
     }
   }
 }

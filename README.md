@@ -24,6 +24,17 @@ npm test        # unit tests for ping parsing, incident detection, storage, CSV
 npm run dist    # build installers (run on each OS: .exe on Windows, .dmg on macOS)
 ```
 
+## Installers (CI)
+GitHub Actions (`.github/workflows/build.yml`) runs the tests and builds a Windows `.exe` installer and macOS `.dmg` files (Intel and Apple Silicon) on every push to `main` and on pull requests; download them from the run's **Artifacts**.
+
+To publish a release, bump `version` in `package.json`, then:
+```
+git tag v0.1.0 && git push origin v0.1.0
+```
+The installers are attached to a new GitHub Release automatically.
+
+Builds are **unsigned**. Windows SmartScreen will warn ("More info" > "Run anyway"), and on macOS right-click the app > Open the first time. To sign, add certificate secrets (`CSC_LINK`, `CSC_KEY_PASSWORD`, plus Apple notarization credentials) and remove `CSC_IDENTITY_AUTO_DISCOVERY` from the workflow.
+
 ## Layout
 - `src/core` – platform-independent monitoring logic (no Electron imports, fully unit-tested)
 - `src/main` – Electron main process: tray, notifications, IPC, file export
