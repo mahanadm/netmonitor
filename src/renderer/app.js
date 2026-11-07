@@ -42,12 +42,31 @@ function renderIncidents() {
       const d = document.createElement('tr');
       const td = document.createElement('td');
       td.colSpan = 5;
-      const pre = document.createElement('pre');
       const t = i.traceroute;
-      pre.textContent = t
-        ? `Traceroute to ${t.target} at ${new Date(t.at).toLocaleTimeString()}\n${t.summary}\n\n` + t.hops.map((h) => `${String(h.hop).padStart(2)}  ${(h.ip || '*').padEnd(16)} ${h.rtt != null ? h.rtt + ' ms' : ''}`).join('\n')
-        : 'Traceroute not captured yet (it runs when an incident starts and can take a few seconds).';
-      td.append(pre); d.append(td); tbody.append(d);
+      if (t) {
+        const started = t.startedAt ?? t.at, finished = t.finishedAt;
+        const late = i.end != null && started >= i.end;                  // began after recovery
+        const straddled = i.end != null && !late && finished != null && finished > i.end; // recovery happened mid-trace
+        const timing = `Started ${new Date(started).toLocaleTimeString()}` + (finished ? `, took ${fmtDur(finished - started)}` : '');
+        if (late || straddled) {
+          const warn = document.createElement('p');
+          warn.className = 'warn';
+          warn.textContent = late
+            ? 'Captured after the incident ended: this shows the recovered path, not the failure.'
+            : 'The incident ended while this trace was running, so later hops may reflect the recovery.';
+          td.append(warn);
+        }
+        const pre = document.createElement('pre');
+        pre.textContent = `Traceroute to ${t.target}. ${timing}\n${t.summary}\n\n`
+          + t.hops.map((h) => `${String(h.hop).padStart(2)}  ${(h.ip || '*').padEnd(16)} ${h.rtt != null ? h.rtt + ' ms' : ''}`).join('\n')
+          + (t.stoppedEarly ? '\n(stopped early: no replies from further hops)' : '');
+        td.append(pre);
+      } else {
+        const pre = document.createElement('pre');
+        pre.textContent = 'Traceroute not captured yet (it starts when the problem is first seen and can take a few seconds).';
+        td.append(pre);
+      }
+      d.append(td); tbody.append(d);
     }
   }
   $('empty').hidden = incidents.length > 0;

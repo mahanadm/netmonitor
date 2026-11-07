@@ -39,7 +39,7 @@ class IncidentDetector {
     };
   }
 
-  // Returns events: {type:'open'|'update'|'close', incident}
+  // Returns events: {type:'suspect'|'open'|'update'|'close', incident}
   process(round, now = Date.now()) {
     const c = this.classify(round);
     const events = [];
@@ -49,7 +49,12 @@ class IncidentDetector {
     for (const type of Object.keys(flags)) {
       const st = this.counters[type];
       if (flags[type]) {
-        if (st.bad === 0) this.pendingStart[type] = now;
+        if (st.bad === 0) {
+          this.pendingStart[type] = now;
+          // Early warning on the first bad round so callers can start diagnostics (e.g. traceroute)
+          // before the incident is confirmed. Not an incident; may turn out to be a blip.
+          if (type !== 'high_latency' && !this.open[type]) events.push({ type: 'suspect', incident: { type, start: now } });
+        }
         st.bad++; st.good = 0;
         if (!this.open[type] && st.bad >= need[type]) {
           const inc = {

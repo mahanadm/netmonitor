@@ -43,7 +43,7 @@ test('disconnect opens after N failed rounds and closes after recovery', () => {
 test('short blip does not create an incident', () => {
   const d = new IncidentDetector();
   const ev = [up(), down(), down(), up(), up()].flatMap((r, i) => d.process(r, i * 2000));
-  assert.strictEqual(ev.length, 0);
+  assert.deepStrictEqual(ev.map((e) => e.type), ['suspect']); // warning only; never an incident
 });
 
 test('high latency tracks peak and closes', () => {
@@ -57,7 +57,7 @@ test('majority failures count as packet loss, not disconnect', () => {
   const d = new IncidentDetector({ lossRounds: 2 });
   const lossy = [{ host: 'a', ok: true, rtt: 10 }, { host: 'b', ok: false, rtt: null }, { host: 'c', ok: false, rtt: null }];
   const ev = [lossy, lossy].flatMap((r, i) => d.process(r, i));
-  assert.strictEqual(ev[0].incident.type, 'packet_loss');
+  assert.strictEqual(ev.find((e) => e.type === 'open').incident.type, 'packet_loss');
 });
 
 test('flush closes open incidents', () => {
@@ -95,10 +95,14 @@ test('monitor tick emits sample and incidents using injected probe', async () =>
   const m = new Monitor({ targets: ['a', 'b', 'c'], detector: { failRounds: 2, recoverRounds: 1 } }, async (h) => { const r = await probe(h); return r; });
   const types = [];
   m.on('incident', (e) => types.push(e.type));
+  const suspects = [];
+  m.on('suspect', (e) => suspects.push(e));
   const samples = [];
   m.on('sample', (s) => samples.push(s));
   for (let i = 0; i < 4; i++) { await m.tick(i * 1000); n += 3; }
   assert.deepStrictEqual(types, ['open', 'close']);
+  assert.strictEqual(suspects.length, 1);
+  assert.strictEqual(suspects[0].start, 0); // fires on the first failed round
   assert.strictEqual(samples[0].online, false);
   assert.strictEqual(samples[3].online, true);
 });
@@ -141,4 +145,33 @@ test('monitor sample latency is the median, not the mean', async () => {
   const m = new Monitor({ targets: ['a', 'b', 'c'] }, async (host) => ({ host, ok: true, rtt: rtts[host] }));
   const s = await m.tick(0);
   assert.strictEqual(s.latency, 20);
+});
+
+const { resolvedTarget, trailingSilent } = require('../src/core/traceroute');
+
+test('suspect fires once per streak on first bad round, not for latency or while open', () => {
+  const d = new IncidentDetector({ failRounds: 2, recoverRounds: 1 });
+  const ev = [up(), down(), down(), down(), up(), down()].flatMap((r, i) => d.process(r, i * 1000));
+  assert.deepStrictEqual(ev.map((e) => `${e.type}`), ['suspect', 'open', 'close', 'suspect']);
+  assert.strictEqual(ev[0].incident.start, 1000);
+  assert.strictEqual(ev[1].incident.start, 1000); // trace requested at suspect time lines up with incident start
+  const lat = new IncidentDetector({ latencyRounds: 1 });
+  assert.deepStrictEqual(lat.process(up(500), 0).map((e) => e.type), ['open']);
+});
+
+test('trailingSilent counts consecutive timed-out hops at the end', () => {
+  const h = (ip) => ({ hop: 1, ip, rtt: null });
+  assert.strictEqual(trailingSilent([h('a'), h(null), h(null)]), 2);
+  assert.strictEqual(trailingSilent([h(null), h('a')]), 0);
+});
+
+test('resolvedTarget reads the header for hostnames and falls back to the host', () => {
+  assert.strictEqual(resolvedTarget('Tracing route to one.one.one.one [1.1.1.1]\n', 'one.one.one.one'), '1.1.1.1');
+  assert.strictEqual(resolvedTarget('traceroute to 1.1.1.1 (1.1.1.1), 15 hops max', '1.1.1.1'), '1.1.1.1');
+  assert.strictEqual(resolvedTarget('Tracing route to 1.1.1.1 over a maximum', '1.1.1.1'), '1.1.1.1');
+});
+
+test('summarize does not claim success when the hop limit is hit', () => {
+  const hops = [{ hop: 1, ip: '10.0.0.1', rtt: 1 }, { hop: 2, ip: '10.0.0.2', rtt: 2 }];
+  assert.match(summarize(hops, '1.1.1.1'), /Hop limit reached at #2/);
 });

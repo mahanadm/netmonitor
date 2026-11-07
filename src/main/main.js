@@ -19,17 +19,18 @@ let settings = { ...DEFAULT_SETTINGS, notifications: true, launchAtLogin: false 
 const startHidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin;
 const samples = [];
 let lastState = 'idle';
-let tracing = false;
+// Traceroutes start on the first failed round (a "suspect"), before the incident is confirmed, so
+// the capture happens while the problem is live. If the streak turns into an incident the trace is
+// attached to it; if it was just a blip the result is discarded.
+let earlyTrace = null, lastSuspectAt = 0;
+const startTrace = () => ({ requestedAt: Date.now(), promise: runTraceroute(settings.targets[0]) });
 
-// Captures the network path at the start of an incident to show where it breaks.
-async function traceFor(incident) {
-  if (tracing) return;
-  tracing = true;
-  try {
-    const traceroute = await runTraceroute(settings.targets[0]);
+function attachTrace(incident) {
+  const tr = earlyTrace && earlyTrace.requestedAt >= incident.start - 1000 ? earlyTrace : startTrace();
+  tr.promise.then((traceroute) => {
     store.upsert({ id: incident.id, traceroute });
     send('incidents', store.list());
-  } finally { tracing = false; }
+  });
 }
 
 const fmtDur = (ms) => {
@@ -107,10 +108,15 @@ function startMonitor() {
       for (const i of open) store.upsert({ ...i, lastSeen: s.t });
     }
   });
+  monitor.on('suspect', ({ start }) => {
+    if (start - lastSuspectAt < 20000) return; // don't trace on every blip
+    lastSuspectAt = start;
+    earlyTrace = startTrace();
+  });
   monitor.on('incident', ({ type, incident }) => {
     store.upsert(incident);
     send('incidents', store.list());
-    if (type === 'open') { notify(LABELS[incident.type], 'Started — recording incident.'); traceFor(incident); }
+    if (type === 'open') { notify(LABELS[incident.type], 'Started — recording incident.'); attachTrace(incident); }
     if (type === 'close') notify(`${LABELS[incident.type]} resolved`, `Lasted ${fmtDur(incident.end - incident.start)}.`);
   });
   monitor.start();

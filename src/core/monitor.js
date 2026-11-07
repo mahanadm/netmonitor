@@ -54,7 +54,10 @@ class Monitor extends EventEmitter {
       latency: median(okRtts), // median, same statistic the detector uses for high-latency incidents
     };
     this.emit('sample', sample);
-    for (const e of this.detector.process(results, now)) this.emit('incident', e);
+    for (const e of this.detector.process(results, now)) {
+      if (e.type === 'suspect') this.emit('suspect', e.incident); // first bad round; may be a blip
+      else this.emit('incident', e);
+    }
     return sample;
   }
 }

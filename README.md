@@ -13,7 +13,7 @@ evidence to show your ISP.
 - An incident is recorded only after several consecutive bad rounds (default 3) and closed after 2 good ones, so one-off blips don't spam the log. Start time is the first bad round.
 - Incidents are stored as JSON in the app's user-data folder; the app keeps running in the tray when the window is closed.
 - Tray icon: green = online, amber = degraded, red = offline. Desktop notifications on start/end of incidents.
-- When an incident starts, a traceroute to the first target is captured (`tracert` on Windows, `traceroute` on macOS) and attached to it. Click an incident row to see the hops and where the path stops responding.
+- A traceroute to the first target starts on the **first failed round**, before the incident is confirmed, so it captures the problem while it is live (`tracert` on Windows, `traceroute` on macOS). If the failure turns out to be a blip the result is discarded. The trace stops early once 4 hops in a row stay silent. Click an incident row to see the hops, when the trace ran, and a warning if it finished after the incident had ended.
 - **Launch at login** (Settings, off by default): starts the app minimized to the tray when you sign in. Only applies to the installed app, not `npm start`.
 - **Export CSV** from the dashboard for sharing.
 
